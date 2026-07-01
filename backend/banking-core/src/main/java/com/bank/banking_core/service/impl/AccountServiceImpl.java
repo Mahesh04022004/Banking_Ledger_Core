@@ -39,7 +39,7 @@ public class AccountServiceImpl implements AccountService {
 
         Account account = accountMapper.toEntity(request);
 
-        account.setAccountNumber(accountNumberGenerator.generate(account.getId()));
+        account.setAccountNumber(accountNumberGenerator.generate());
         account.setCustomerName(request.getCustomerName());
         account.setEmail(request.getEmail());
         account.setCurrentBalance(request.getInitialBalance());
