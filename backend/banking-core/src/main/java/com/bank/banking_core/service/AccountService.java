@@ -10,7 +10,7 @@ import java.util.List;
 public interface AccountService {
 
     AccountResponse createAccount(CreateAccountRequest request);
-    
+
     AccountResponse getAccount(Long accountId);
 
     List<AccountResponse> getAllAccounts();
