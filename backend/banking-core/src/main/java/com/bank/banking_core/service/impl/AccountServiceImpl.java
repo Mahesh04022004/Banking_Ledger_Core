@@ -1,5 +1,6 @@
 package com.bank.banking_core.service.impl;
 
+import com.bank.banking_core.constants.ApiMessages;
 import com.bank.banking_core.dto.request.CreateAccountRequest;
 import com.bank.banking_core.dto.request.DepositRequest;
 import com.bank.banking_core.dto.request.WithdrawRequest;
@@ -33,12 +34,12 @@ public class AccountServiceImpl implements AccountService {
     public AccountResponse createAccount(CreateAccountRequest request) {
 
         if (accountRepository.existsByEmail(request.getEmail())) {
-            throw new BadRequestException("Email already exists.");
+            throw new BadRequestException(ApiMessages.EMAIL_ALREADY_EXISTS);
         }
 
-        Account account = new Account();
+        Account account = accountMapper.toEntity(request);
 
-        account.setAccountNumber(accountNumberGenerator.generate());
+        account.setAccountNumber(accountNumberGenerator.generate(account.getId()));
         account.setCustomerName(request.getCustomerName());
         account.setEmail(request.getEmail());
         account.setCurrentBalance(request.getInitialBalance());
@@ -54,7 +55,7 @@ public class AccountServiceImpl implements AccountService {
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Account not found."));
+                        new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
         return accountMapper.toResponse(account);
     }
@@ -72,7 +73,7 @@ public class AccountServiceImpl implements AccountService {
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Account not found."));
+                        new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
         account.setCurrentBalance(
                 account.getCurrentBalance().add(request.getAmount())
@@ -86,10 +87,10 @@ public class AccountServiceImpl implements AccountService {
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() ->
-                        new ResourceNotFoundException("Account not found."));
+                        new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
         if (account.getCurrentBalance().compareTo(request.getAmount()) < 0) {
-            throw new InsufficientBalanceException("Insufficient balance.");
+            throw new InsufficientBalanceException(ApiMessages.INSUFFICIENT_BALANCE);
         }
 
         account.setCurrentBalance(

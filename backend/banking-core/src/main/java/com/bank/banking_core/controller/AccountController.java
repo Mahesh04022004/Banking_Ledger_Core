@@ -1,5 +1,6 @@
 package com.bank.banking_core.controller;
 
+import com.bank.banking_core.constants.ApiMessages;
 import com.bank.banking_core.dto.request.CreateAccountRequest;
 import com.bank.banking_core.dto.request.DepositRequest;
 import com.bank.banking_core.dto.request.WithdrawRequest;
@@ -32,7 +33,7 @@ public class AccountController {
 
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponseUtil.success(
-                        "Account created successfully.",
+                        ApiMessages.ACCOUNT_CREATED,
                         response
                 ));
     }
@@ -45,7 +46,7 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 ApiResponseUtil.success(
-                        "Account fetched successfully.",
+                        ApiMessages.ACCOUNT_FETCHED,
                         response
                 )
         );
@@ -59,7 +60,7 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 ApiResponseUtil.success(
-                        "Accounts fetched successfully.",
+                        ApiMessages.ACCOUNT_FETCHED,
                         response
                 )
         );
@@ -75,7 +76,7 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 ApiResponseUtil.success(
-                        "Amount deposited successfully.",
+                        ApiMessages.AMOUNT_DEPOSITED,
                         response
                 )
         );
@@ -91,7 +92,7 @@ public class AccountController {
 
         return ResponseEntity.ok(
                 ApiResponseUtil.success(
-                        "Amount withdrawn successfully.",
+                        ApiMessages.AMOUNT_WITHDRAWN,
                         response
                 )
         );
