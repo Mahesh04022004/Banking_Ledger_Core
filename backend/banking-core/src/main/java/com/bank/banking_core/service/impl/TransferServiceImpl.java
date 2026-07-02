@@ -39,7 +39,7 @@ public class TransferServiceImpl implements TransferService {
 
         // Cannot transfer to same account
         if (sender.getAccountNumber().equals(receiver.getAccountNumber())) {
-            throw new BadRequestException("Sender and receiver accounts cannot be the same.");
+            throw new BadRequestException(ApiMessages.SAME_ACCOUNT_TRANSFER);
         }
 
         // Sufficient balance check
