@@ -36,4 +36,10 @@ public final class ApiMessages {
 
     public static final String INTERNAL_SERVER_ERROR =
             "Something went wrong.";
+
+    public static final String TRANSFER_SUCCESSFUL =
+            "Transfer completed successfully.";
+
+    public static final String SAME_ACCOUNT_TRANSFER =
+            "Sender and receiver accounts cannot be the same.";
 }
