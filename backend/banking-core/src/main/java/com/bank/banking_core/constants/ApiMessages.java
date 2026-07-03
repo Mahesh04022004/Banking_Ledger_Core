@@ -51,4 +51,7 @@ public final class ApiMessages {
 
     public static final String TRANSACTION_FETCHED_SUCCESSFULLY =
             "Transaction fetched successfully.";
+
+    public static final String LOCK_ACQUISITION_FAILED =
+            "Unable to acquire distributed lock. Please retry the request.";
 }

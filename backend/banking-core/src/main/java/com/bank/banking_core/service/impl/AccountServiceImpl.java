@@ -10,8 +10,10 @@ import com.bank.banking_core.exception.*;
 import com.bank.banking_core.mapper.AccountMapper;
 import com.bank.banking_core.repository.AccountRepository;
 import com.bank.banking_core.service.AccountService;
+import com.bank.banking_core.service.DistributedLockService;
 import com.bank.banking_core.service.LedgerService;
 import com.bank.banking_core.util.AccountNumberGenerator;
+import com.bank.banking_core.util.LockKeyGenerator;
 import com.bank.banking_core.util.TransactionReferenceGenerator;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -29,13 +31,17 @@ public class AccountServiceImpl implements AccountService {
     private final AccountMapper accountMapper;
     private final TransactionReferenceGenerator transactionReferenceGenerator;
     private final LedgerService ledgerService;
+    private final DistributedLockService distributedLockService;
+    private final LockKeyGenerator lockKeyGenerator;
 
-    public AccountServiceImpl(AccountRepository accountRepository, AccountNumberGenerator accountNumberGenerator, AccountMapper accountMapper, TransactionReferenceGenerator transactionReferenceGenerator, LedgerService ledgerService) {
+    public AccountServiceImpl(AccountRepository accountRepository, AccountNumberGenerator accountNumberGenerator, AccountMapper accountMapper, TransactionReferenceGenerator transactionReferenceGenerator, LedgerService ledgerService, DistributedLockService distributedLockService, LockKeyGenerator lockKeyGenerator) {
         this.accountRepository = accountRepository;
         this.accountNumberGenerator = accountNumberGenerator;
         this.accountMapper = accountMapper;
         this.transactionReferenceGenerator = transactionReferenceGenerator;
         this.ledgerService = ledgerService;
+        this.distributedLockService = distributedLockService;
+        this.lockKeyGenerator = lockKeyGenerator;
     }
 
     @Override
@@ -77,78 +83,87 @@ public class AccountServiceImpl implements AccountService {
     }
 
     @Override
+    @Transactional
     public AccountResponse deposit(Long accountId, DepositRequest request) {
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
-        // Generate transaction reference
-        String transactionReference = transactionReferenceGenerator.generate();
-
-        // Store balance before deposit
-        BigDecimal balanceBefore = account.getCurrentBalance();
-
-        // Update balance
-        account.setCurrentBalance(
-                balanceBefore.add(request.getAmount())
+        List<String> lockKeys = lockKeyGenerator.accountLocks(
+                account.getAccountNumber()
         );
 
-        // Save updated account
-        accountRepository.save(account);
+        return distributedLockService.executeWithLocks(lockKeys, () -> {
 
-        // Record ledger entry
-        ledgerService.recordEntry(
-                account,
-                transactionReference,
-                EntryType.CREDIT,
-                request.getAmount(),
-                balanceBefore,
-                account.getCurrentBalance(),
-                ApiMessages.AMOUNT_DEPOSITED
-        );
+            Account lockedAccount = accountRepository.findById(accountId)
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
-        return accountMapper.toResponse(account);
+            BigDecimal balanceBefore = lockedAccount.getCurrentBalance();
+
+            lockedAccount.setCurrentBalance(
+                    balanceBefore.add(request.getAmount())
+            );
+
+            accountRepository.save(lockedAccount);
+
+            ledgerService.recordEntry(
+                    lockedAccount,
+                    transactionReferenceGenerator.generate(),
+                    EntryType.CREDIT,
+                    request.getAmount(),
+                    balanceBefore,
+                    lockedAccount.getCurrentBalance(),
+                    ApiMessages.AMOUNT_DEPOSITED
+            );
+
+            return accountMapper.toResponse(lockedAccount);
+        });
     }
 
     @Override
+    @Transactional
     public AccountResponse withdraw(Long accountId, WithdrawRequest request) {
 
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() ->
                         new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
-        // Check sufficient balance
-        if (account.getCurrentBalance().compareTo(request.getAmount()) < 0) {
-            throw new InsufficientBalanceException(ApiMessages.INSUFFICIENT_BALANCE);
-        }
-
-        // Generate transaction reference
-        String transactionReference = transactionReferenceGenerator.generate();
-
-        // Store balance before withdrawal
-        BigDecimal balanceBefore = account.getCurrentBalance();
-
-        // Update balance
-        account.setCurrentBalance(
-                balanceBefore.subtract(request.getAmount())
+        List<String> lockKeys = lockKeyGenerator.accountLocks(
+                account.getAccountNumber()
         );
 
-        // Save updated account
-        accountRepository.save(account);
+        return distributedLockService.executeWithLocks(lockKeys, () -> {
 
-        // Record ledger entry
-        ledgerService.recordEntry(
-                account,
-                transactionReference,
-                EntryType.DEBIT,
-                request.getAmount(),
-                balanceBefore,
-                account.getCurrentBalance(),
-                ApiMessages.AMOUNT_WITHDRAWN
-        );
+            Account lockedAccount = accountRepository.findById(accountId)
+                    .orElseThrow(() ->
+                            new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
-        return accountMapper.toResponse(account);
+            BigDecimal balanceBefore = lockedAccount.getCurrentBalance();
+
+            if (balanceBefore.compareTo(request.getAmount()) < 0) {
+                throw new InsufficientBalanceException(ApiMessages.INSUFFICIENT_BALANCE);
+            }
+
+            lockedAccount.setCurrentBalance(
+                    balanceBefore.subtract(request.getAmount())
+            );
+
+            accountRepository.save(lockedAccount);
+
+            ledgerService.recordEntry(
+                    lockedAccount,
+                    transactionReferenceGenerator.generate(),
+                    EntryType.DEBIT,
+                    request.getAmount(),
+                    balanceBefore,
+                    lockedAccount.getCurrentBalance(),
+                    ApiMessages.AMOUNT_WITHDRAWN
+            );
+
+            return accountMapper.toResponse(lockedAccount);
+        });
     }
 
 
