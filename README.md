@@ -1,103 +1,174 @@
-# Banking Core Ledger
+# 🏦 Banking Core Ledger
 
-A production-inspired backend banking application built with **Java 21**, **Spring Boot**, and **MySQL**.
+A production-inspired Banking Core Ledger built with **Spring Boot**, following enterprise backend design principles such as **event-driven architecture**, **double-entry ledger**, **distributed locking**, and **Apache Kafka**.
 
-This project demonstrates how modern banking systems manage accounts, money transfers, and immutable financial records using a **Double-Entry Ledger** architecture.
-
-> **Project Status:** Phase 4.1 Completed (Ledger Module + Statement APIs)
+This project is designed as a backend portfolio project to demonstrate real-world banking concepts beyond CRUD applications.
 
 ---
 
-# Features
+# ✨ Features
 
 ## Account Management
 
-* Create Account
-* Get Account by ID
-* Get All Accounts
+- Create Account
+- View Account
+- View All Accounts
+- Deposit Money
+- Withdraw Money
+- Transfer Money
 
-## Banking Operations
+---
 
-* Deposit Money
-* Withdraw Money
-* Transfer Money between Accounts
+## Ledger
 
-## Double Entry Ledger
-
-Every financial operation creates immutable ledger records.
+Every balance-changing operation creates an immutable ledger entry.
 
 Supported operations:
 
-* Deposit
-* Withdrawal
-* Transfer (Debit + Credit entries)
+- Deposit
+- Withdraw
+- Transfer (Debit + Credit)
 
-## Statement APIs
+Each ledger entry stores:
 
-* View Account Statement
-* View Transaction Details using Transaction Reference
-
-## Common Features
-
-* Global API Response
-* Global Exception Handling
-* Validation
-* Transaction Management
-* Clean Layered Architecture
-* DTO Mapping
+- Transaction Reference
+- Entry Type
+- Amount
+- Balance Before
+- Balance After
+- Timestamp
 
 ---
 
-# Tech Stack
+## Event-Driven Architecture
 
-| Technology      | Version |
-| --------------- | ------- |
-| Java            | 21      |
-| Spring Boot     | 3.x     |
-| Spring Data JPA | Latest  |
-| MySQL           | 8+      |
-| Maven           | Latest  |
+Every successful transaction publishes a Kafka event.
+
+Supported events:
+
+- Deposit
+- Withdraw
+- Transfer
+
+Consumers currently implemented:
+
+- Audit Consumer
 
 ---
 
-# Project Structure
+## Distributed Locking
+
+Uses **Redis + Redisson** to prevent race conditions during concurrent transactions.
+
+Supports:
+
+- Safe Deposit
+- Safe Withdraw
+- Safe Transfer
+
+---
+
+## Kafka
+
+Uses Apache Kafka for asynchronous event publishing.
+
+Current implementation includes:
+
+- Kafka Producer
+- Kafka Consumer
+- Producer Callbacks
+- Retry Support
+- Dead Letter Topic (DLT)
+
+---
+
+# 🏗 Architecture
 
 ```
-src/main/java
-
-├── config
-├── constants
-├── controller
-├── dto
-│   ├── request
-│   └── response
-├── entity
-├── enums
-├── exception
-├── mapper
-├── repository
-├── response
-├── service
-│   └── impl
-├── util
-└── BankingCoreApplication
+                    REST API
+                        │
+                        ▼
+                 Service Layer
+                        │
+        ┌───────────────┼───────────────┐
+        ▼               ▼               ▼
+   Account         Ledger         Event Publisher
+ Repository       Repository            │
+                                        ▼
+                                     Kafka Topic
+                                        │
+                              ┌─────────┴─────────┐
+                              ▼                   ▼
+                       Audit Consumer       Future Consumers
 ```
 
 ---
 
-# Prerequisites
+# 🛠 Tech Stack
+
+| Technology | Purpose |
+|------------|---------|
+| Java 21 | Programming Language |
+| Spring Boot | Backend Framework |
+| Spring Data JPA | Database Access |
+| MySQL | Database |
+| Redis | Distributed Locking |
+| Redisson | Distributed Lock Implementation |
+| Apache Kafka | Event Streaming |
+| Docker Compose | Local Infrastructure |
+| Maven | Dependency Management |
+| Swagger/OpenAPI | API Documentation |
+
+---
+
+# 📁 Project Structure
+
+```
+backend/
+ └── banking-core
+      ├── controller
+      ├── service
+      ├── repository
+      ├── entity
+      ├── dto
+      ├── mapper
+      ├── ledger
+      ├── event
+      │     ├── producer
+      │     ├── consumer
+      │     ├── mapper
+      │     └── model
+      ├── config
+      ├── util
+      └── exception
+```
+
+---
+
+# ⚙ Prerequisites
 
 Install:
 
-* Java 21
-* Maven
-* MySQL
+- Java 21
+- Maven
+- Docker Desktop
+- MySQL 8+
 
 ---
 
-# Database Setup
+# 🚀 Running Locally
 
-Create a database.
+## 1. Clone Repository
+
+```bash
+git clone https://github.com/Mahesh04022004/Banking_Ledger_Core.git
+
+cd Banking_Ledger_Core/backend/banking-core
+```
+
+---
+
+## 2. Create Database
 
 ```sql
 CREATE DATABASE banking_core;
@@ -105,36 +176,47 @@ CREATE DATABASE banking_core;
 
 ---
 
-# Configure Database
+## 3. Configure Database
 
-Update `application.properties`
+Update:
+
+```
+application.properties
+```
 
 ```properties
 spring.datasource.url=jdbc:mysql://localhost:3306/banking_core
-spring.datasource.username=root
-spring.datasource.password=YOUR_PASSWORD
 
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
+spring.datasource.username=YOUR_USERNAME
+
+spring.datasource.password=YOUR_PASSWORD
 ```
 
 ---
 
-# Run the Project
-
-Clone the repository.
+## 4. Start Redis & Kafka
 
 ```bash
-git clone <repository-url>
+docker compose up -d
 ```
 
-Go inside the project.
+Verify:
 
 ```bash
-cd backend/banking-core
+docker ps
 ```
 
-Run
+Expected:
+
+```
+banking-redis
+
+banking-kafka
+```
+
+---
+
+## 5. Run Spring Boot
 
 ```bash
 mvn spring-boot:run
@@ -142,248 +224,203 @@ mvn spring-boot:run
 
 or
 
-```bash
-./mvnw spring-boot:run
+Run `BankingCoreApplication` from your IDE.
+
+---
+
+# 📚 Swagger
+
+After the application starts:
+
+```
+http://localhost:8081/swagger-ui/index.html
 ```
 
-Application starts on
+OpenAPI JSON:
 
 ```
-http://localhost:8081
+http://localhost:8081/v3/api-docs
 ```
 
 ---
 
-# API Endpoints
+# 📬 API Overview
 
-## Account APIs
+## Account
 
-### Create Account
-
-```
-POST /api/v1/accounts
-```
-
-Example Request
-
-```json
-{
-  "customerName": "Mahesh",
-  "email": "mahesh@example.com",
-  "initialBalance": 10000
-}
-```
-
----
-
-### Get Account
-
-```
-GET /api/v1/accounts/{id}
-```
-
----
-
-### Get All Accounts
-
-```
-GET /api/v1/accounts
-```
+| Method | Endpoint |
+|---------|----------|
+| POST | /api/accounts |
+| GET | /api/accounts |
+| GET | /api/accounts/{id} |
 
 ---
 
 ## Deposit
 
-```
-POST /api/v1/accounts/{id}/deposit
-```
-
-Example
-
-```json
-{
-  "amount": 5000
-}
-```
+| Method | Endpoint |
+|---------|----------|
+| POST | /api/accounts/{id}/deposit |
 
 ---
 
 ## Withdraw
 
+| Method | Endpoint |
+|---------|----------|
+| POST | /api/accounts/{id}/withdraw |
+
+---
+
+## Transfer
+
+| Method | Endpoint |
+|---------|----------|
+| POST | /api/transfers |
+
+---
+
+# 🔁 Transaction Flow
+
 ```
-POST /api/v1/accounts/{id}/withdraw
+Client
+
+   │
+
+   ▼
+
+Spring Boot API
+
+   │
+
+   ▼
+
+Distributed Lock (Redis)
+
+   │
+
+   ▼
+
+Update Database
+
+   │
+
+   ▼
+
+Create Ledger Entry
+
+   │
+
+   ▼
+
+Publish Kafka Event
+
+   │
+
+   ▼
+
+Audit Consumer
 ```
 
-Example
+---
+
+# 🔒 Distributed Locking
+
+Redisson locks ensure that concurrent requests cannot update the same account simultaneously.
+
+Benefits:
+
+- Prevents race conditions
+- Prevents lost updates
+- Ensures balance consistency
+
+---
+
+# 📡 Kafka Events
+
+Every successful transaction publishes:
 
 ```json
 {
-  "amount": 2000
+  "transactionReference": "TRX123456",
+  "eventType": "TRANSFER",
+  "fromAccount": "ACC000001",
+  "toAccount": "ACC000002",
+  "amount": 500,
+  "timestamp": "2026-07-03T12:30:45"
 }
 ```
 
 ---
 
-## Transfer Money
+# 🔄 Retry & Dead Letter Topic
+
+Kafka consumers support:
+
+- Automatic Retry
+- Exponential Backoff
+- Dead Letter Topic
+
+Failed messages are redirected to:
 
 ```
-POST /api/v1/transfers
+transaction-events-dlt
 ```
 
-Example
+---
+
+# 🧪 Testing
+
+Example Transfer:
+
+```http
+POST /api/transfers
+```
 
 ```json
 {
-  "fromAccountNumber": "ACC00000001",
-  "toAccountNumber": "ACC00000002",
-  "amount": 1000
+  "fromAccountNumber": "ACC000001",
+  "toAccountNumber": "ACC000002",
+  "amount": 500
 }
 ```
 
----
+After execution:
 
-## Account Statement
-
-```
-GET /api/v1/ledger/accounts/{accountNumber}/statement
-```
-
----
-
-## Transaction Details
-
-```
-GET /api/v1/ledger/transactions/{transactionReference}
-```
+- Account balance updated
+- Ledger entries created
+- Kafka event published
+- Audit consumer processes event
 
 ---
 
-# Sample Flow
+# 🚀 Future Enhancements
 
-### Step 1
-
-Create two accounts.
-
-```
-Mahesh
-Balance : 10000
-```
-
-```
-Rahul
-Balance : 5000
-```
-
-### Step 2
-
-Transfer
-
-```
-1000
-
-Mahesh → Rahul
-```
-
-### Step 3
-
-Check balances.
-
-Mahesh
-
-```
-9000
-```
-
-Rahul
-
-```
-6000
-```
-
-### Step 4
-
-Fetch statement.
-
-```
-GET /api/v1/ledger/accounts/ACC00000001/statement
-```
-
-The response will contain the debit ledger entry.
-
-### Step 5
-
-Fetch transaction.
-
-```
-GET /api/v1/ledger/transactions/{transactionReference}
-```
-
-The response will contain both the debit and credit entries for the transfer.
+- Transactional Outbox Pattern
+- Notification Service
+- Fraud Detection Service
+- Analytics Consumer
+- JWT Authentication
+- Prometheus Metrics
+- Grafana Dashboard
+- Kubernetes Deployment
+- CI/CD Pipeline
+- Integration Tests
+- Testcontainers
+- Multi-Broker Kafka Cluster
 
 ---
 
-# Current Architecture
+# 👨‍💻 Author
 
-```
-Controller
-        │
-        ▼
-Service
-        │
-        ▼
-Repository
-        │
-        ▼
-MySQL
-```
+**Mahesh**
 
-Money transfer flow:
+GitHub:
 
-```
-Transfer Request
-        │
-        ▼
-Business Validation
-        │
-        ▼
-Update Account Balances
-        │
-        ▼
-Persist Ledger Entries
-        │
-        ▼
-Return Response
-```
+https://github.com/Mahesh04022004
 
 ---
 
-# Current Limitations
+# 📄 License
 
-This project is still under active development.
-
-Upcoming features include:
-
-* Concurrency Handling
-* Optimistic Locking
-* Pessimistic Locking
-* Redis Distributed Lock (Redisson)
-* Kafka Event Publishing
-* Unit Testing
-* Integration Testing
-* Swagger / OpenAPI Documentation
-
----
-
-# Version
-
-Current Version
-
-```
-v0.5.0
-```
-
----
-
-# License
-
-This project is intended for learning, portfolio demonstration, and backend architecture practice.
+This project is intended for educational and portfolio purposes.
