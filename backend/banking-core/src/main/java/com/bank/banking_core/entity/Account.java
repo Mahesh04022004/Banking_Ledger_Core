@@ -7,10 +7,6 @@ import java.math.BigDecimal;
 @Table(name = "account")
 public class Account extends BaseEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
     @Column(name = "account_number", nullable = false, unique = true, length = 20)
     private String accountNumber;
 
