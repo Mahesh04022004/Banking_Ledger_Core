@@ -1,5 +1,7 @@
 package com.bank.banking_core.service.impl;
 
+import com.bank.banking_core.constants.ApiMessages;
+import com.bank.banking_core.exception.LockAcquisitionException;
 import com.bank.banking_core.service.DistributedLockService;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -8,6 +10,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 @Service
 public class RedissonDistributedLockService
@@ -22,9 +25,9 @@ public class RedissonDistributedLockService
     }
 
     @Override
-    public void executeWithLocks(
+    public <T> T executeWithLocks(
             List<String> lockKeys,
-            Runnable action) {
+            Supplier<T> action) {
 
         List<RLock> locks = new ArrayList<>();
 
@@ -41,21 +44,23 @@ public class RedissonDistributedLockService
                 );
 
                 if (!acquired) {
-                    throw new RuntimeException(
-                            "Unable to acquire lock: " + key
+                    throw new LockAcquisitionException(
+                            ApiMessages.LOCK_ACQUISITION_FAILED
                     );
                 }
 
                 locks.add(lock);
             }
 
-            action.run();
+            return action.get();
 
         } catch (InterruptedException e) {
 
             Thread.currentThread().interrupt();
 
-            throw new RuntimeException("Thread interrupted.", e);
+            throw new LockAcquisitionException(
+                    ApiMessages.LOCK_ACQUISITION_FAILED
+            );
 
         } finally {
 
@@ -63,7 +68,7 @@ public class RedissonDistributedLockService
 
                 RLock lock = locks.get(i);
 
-                if (lock.isHeldByCurrentThread()) {
+                if (lock != null && lock.isHeldByCurrentThread()) {
                     lock.unlock();
                 }
             }

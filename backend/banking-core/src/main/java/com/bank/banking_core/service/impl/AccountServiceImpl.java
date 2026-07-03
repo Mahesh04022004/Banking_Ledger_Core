@@ -90,8 +90,8 @@ public class AccountServiceImpl implements AccountService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
-        List<String> lockKeys = List.of(
-                lockKeyGenerator.accountLock(account.getAccountNumber())
+        List<String> lockKeys = lockKeyGenerator.accountLocks(
+                account.getAccountNumber()
         );
 
         return distributedLockService.executeWithLocks(lockKeys, () -> {
@@ -130,8 +130,8 @@ public class AccountServiceImpl implements AccountService {
                 .orElseThrow(() ->
                         new ResourceNotFoundException(ApiMessages.ACCOUNT_NOT_FOUND));
 
-        List<String> lockKeys = List.of(
-                lockKeyGenerator.accountLock(account.getAccountNumber())
+        List<String> lockKeys = lockKeyGenerator.accountLocks(
+                account.getAccountNumber()
         );
 
         return distributedLockService.executeWithLocks(lockKeys, () -> {

@@ -46,14 +46,10 @@ public class TransferServiceImpl implements TransferService {
     @Transactional
     public TransferResponse transfer(TransferRequest request) {
 
-        List<String> lockKeys = List.of(
-                lockKeyGenerator.accountLock(request.getFromAccountNumber()),
-                lockKeyGenerator.accountLock(request.getToAccountNumber())
+        List<String> lockKeys = lockKeyGenerator.accountLocks(
+                request.getFromAccountNumber(),
+                request.getToAccountNumber()
         );
-
-        lockKeys = lockKeys.stream()
-                .sorted()
-                .toList();
 
         return distributedLockService.executeWithLocks(lockKeys, () -> {
 

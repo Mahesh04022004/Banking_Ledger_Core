@@ -2,6 +2,8 @@ package com.bank.banking_core.util;
 
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class LockKeyGenerator {
 
@@ -11,4 +13,12 @@ public class LockKeyGenerator {
         return ACCOUNT_LOCK_PREFIX + accountNumber;
     }
 
+    public List<String> accountLocks(String... accountNumbers) {
+
+        return List.of(accountNumbers)
+                .stream()
+                .sorted()
+                .map(this::accountLock)
+                .toList();
+    }
 }
