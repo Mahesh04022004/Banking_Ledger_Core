@@ -6,6 +6,9 @@ import com.bank.banking_core.dto.request.DepositRequest;
 import com.bank.banking_core.dto.request.WithdrawRequest;
 import com.bank.banking_core.dto.response.AccountResponse;
 import com.bank.banking_core.enums.EntryType;
+import com.bank.banking_core.event.mappper.TransactionEventMapper;
+import com.bank.banking_core.event.model.TransactionEvent;
+import com.bank.banking_core.event.producer.EventPublisher;
 import com.bank.banking_core.exception.*;
 import com.bank.banking_core.mapper.AccountMapper;
 import com.bank.banking_core.repository.AccountRepository;
@@ -33,8 +36,10 @@ public class AccountServiceImpl implements AccountService {
     private final LedgerService ledgerService;
     private final DistributedLockService distributedLockService;
     private final LockKeyGenerator lockKeyGenerator;
+    private final EventPublisher eventPublisher;
+    private final TransactionEventMapper transactionEventMapper;
 
-    public AccountServiceImpl(AccountRepository accountRepository, AccountNumberGenerator accountNumberGenerator, AccountMapper accountMapper, TransactionReferenceGenerator transactionReferenceGenerator, LedgerService ledgerService, DistributedLockService distributedLockService, LockKeyGenerator lockKeyGenerator) {
+    public AccountServiceImpl(AccountRepository accountRepository, AccountNumberGenerator accountNumberGenerator, AccountMapper accountMapper, TransactionReferenceGenerator transactionReferenceGenerator, LedgerService ledgerService, DistributedLockService distributedLockService, LockKeyGenerator lockKeyGenerator, EventPublisher eventPublisher, TransactionEventMapper transactionEventMapper) {
         this.accountRepository = accountRepository;
         this.accountNumberGenerator = accountNumberGenerator;
         this.accountMapper = accountMapper;
@@ -42,6 +47,8 @@ public class AccountServiceImpl implements AccountService {
         this.ledgerService = ledgerService;
         this.distributedLockService = distributedLockService;
         this.lockKeyGenerator = lockKeyGenerator;
+        this.eventPublisher = eventPublisher;
+        this.transactionEventMapper = transactionEventMapper;
     }
 
     @Override
@@ -107,16 +114,24 @@ public class AccountServiceImpl implements AccountService {
             );
 
             accountRepository.save(lockedAccount);
-
+            String transactionReference = transactionReferenceGenerator.generate();
             ledgerService.recordEntry(
                     lockedAccount,
-                    transactionReferenceGenerator.generate(),
+                    transactionReference,
                     EntryType.CREDIT,
                     request.getAmount(),
                     balanceBefore,
                     lockedAccount.getCurrentBalance(),
                     ApiMessages.AMOUNT_DEPOSITED
             );
+            TransactionEvent event =
+                    transactionEventMapper.depositEvent(
+                            transactionReference,
+                            account.getAccountNumber(),
+                            request.getAmount()
+                    );
+
+            eventPublisher.publish(event);
 
             return accountMapper.toResponse(lockedAccount);
         });
@@ -151,16 +166,25 @@ public class AccountServiceImpl implements AccountService {
             );
 
             accountRepository.save(lockedAccount);
-
+            String transactionReference = transactionReferenceGenerator.generate();
             ledgerService.recordEntry(
                     lockedAccount,
-                    transactionReferenceGenerator.generate(),
+                    transactionReference,
                     EntryType.DEBIT,
                     request.getAmount(),
                     balanceBefore,
                     lockedAccount.getCurrentBalance(),
                     ApiMessages.AMOUNT_WITHDRAWN
             );
+
+            TransactionEvent event =
+                    transactionEventMapper.withdrawEvent(
+                            transactionReference,
+                            account.getAccountNumber(),
+                            request.getAmount()
+                    );
+
+            eventPublisher.publish(event);
 
             return accountMapper.toResponse(lockedAccount);
         });

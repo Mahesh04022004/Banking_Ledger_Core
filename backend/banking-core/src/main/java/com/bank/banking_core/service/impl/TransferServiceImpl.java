@@ -5,6 +5,9 @@ import com.bank.banking_core.dto.request.TransferRequest;
 import com.bank.banking_core.dto.response.TransferResponse;
 import com.bank.banking_core.entity.Account;
 import com.bank.banking_core.enums.EntryType;
+import com.bank.banking_core.event.mappper.TransactionEventMapper;
+import com.bank.banking_core.event.model.TransactionEvent;
+import com.bank.banking_core.event.producer.EventPublisher;
 import com.bank.banking_core.exception.BadRequestException;
 import com.bank.banking_core.exception.InsufficientBalanceException;
 import com.bank.banking_core.exception.ResourceNotFoundException;
@@ -32,14 +35,18 @@ public class TransferServiceImpl implements TransferService {
     private final LedgerService ledgerService;
     private final DistributedLockService distributedLockService;
     private final LockKeyGenerator lockKeyGenerator;
+    private final EventPublisher eventPublisher;
+    private final TransactionEventMapper transactionEventMapper;
 
-    public TransferServiceImpl(AccountRepository accountRepository, TransactionReferenceGenerator transactionReferenceGenerator, TransferMapper transferMapper, LedgerService ledgerService, DistributedLockService distributedLockService, LockKeyGenerator lockKeyGenerator) {
+    public TransferServiceImpl(AccountRepository accountRepository, TransactionReferenceGenerator transactionReferenceGenerator, TransferMapper transferMapper, LedgerService ledgerService, DistributedLockService distributedLockService, LockKeyGenerator lockKeyGenerator, EventPublisher eventPublisher, TransactionEventMapper transactionEventMapper) {
         this.accountRepository = accountRepository;
         this.transactionReferenceGenerator = transactionReferenceGenerator;
         this.transferMapper = transferMapper;
         this.ledgerService = ledgerService;
         this.distributedLockService = distributedLockService;
         this.lockKeyGenerator = lockKeyGenerator;
+        this.eventPublisher = eventPublisher;
+        this.transactionEventMapper = transactionEventMapper;
     }
 
     @Override
@@ -106,6 +113,16 @@ public class TransferServiceImpl implements TransferService {
                     receiver.getCurrentBalance(),
                     "Transfer from " + sender.getAccountNumber()
             );
+
+            TransactionEvent event =
+                    transactionEventMapper.transferEvent(
+                            transactionReference,
+                            sender.getAccountNumber(),
+                            receiver.getAccountNumber(),
+                            request.getAmount()
+                    );
+
+            eventPublisher.publish(event);
 
             return transferMapper.toResponse(
                     transactionReference,
