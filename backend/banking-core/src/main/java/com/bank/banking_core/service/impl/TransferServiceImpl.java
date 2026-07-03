@@ -10,8 +10,10 @@ import com.bank.banking_core.exception.InsufficientBalanceException;
 import com.bank.banking_core.exception.ResourceNotFoundException;
 import com.bank.banking_core.mapper.TransferMapper;
 import com.bank.banking_core.repository.AccountRepository;
+import com.bank.banking_core.service.DistributedLockService;
 import com.bank.banking_core.service.LedgerService;
 import com.bank.banking_core.service.TransferService;
+import com.bank.banking_core.util.LockKeyGenerator;
 import com.bank.banking_core.util.TransactionReferenceGenerator;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
@@ -28,78 +30,94 @@ public class TransferServiceImpl implements TransferService {
     private final TransactionReferenceGenerator transactionReferenceGenerator;
     private final TransferMapper transferMapper;
     private final LedgerService ledgerService;
+    private final DistributedLockService distributedLockService;
+    private final LockKeyGenerator lockKeyGenerator;
 
-    public TransferServiceImpl(AccountRepository accountRepository, TransactionReferenceGenerator transactionReferenceGenerator, TransferMapper transferMapper, LedgerService ledgerService) {
+    public TransferServiceImpl(AccountRepository accountRepository, TransactionReferenceGenerator transactionReferenceGenerator, TransferMapper transferMapper, LedgerService ledgerService, DistributedLockService distributedLockService, LockKeyGenerator lockKeyGenerator) {
         this.accountRepository = accountRepository;
         this.transactionReferenceGenerator = transactionReferenceGenerator;
         this.transferMapper = transferMapper;
         this.ledgerService = ledgerService;
+        this.distributedLockService = distributedLockService;
+        this.lockKeyGenerator = lockKeyGenerator;
     }
 
     @Override
+    @Transactional
     public TransferResponse transfer(TransferRequest request) {
 
-        Account sender = getAccountByNumber(request.getFromAccountNumber());
-        Account receiver = getAccountByNumber(request.getToAccountNumber());
-
-        // Cannot transfer to the same account
-        if (sender.getAccountNumber().equals(receiver.getAccountNumber())) {
-            throw new BadRequestException(ApiMessages.SAME_ACCOUNT_TRANSFER);
-        }
-
-        // Check sufficient balance
-        if (sender.getCurrentBalance().compareTo(request.getAmount()) < 0) {
-            throw new InsufficientBalanceException(ApiMessages.INSUFFICIENT_BALANCE);
-        }
-
-        // Generate transaction reference
-        String transactionReference = transactionReferenceGenerator.generate();
-
-        // Store balances before transaction
-        BigDecimal senderBalanceBefore = sender.getCurrentBalance();
-        BigDecimal receiverBalanceBefore = receiver.getCurrentBalance();
-
-        // Update balances
-        sender.setCurrentBalance(
-                senderBalanceBefore.subtract(request.getAmount())
+        List<String> lockKeys = List.of(
+                lockKeyGenerator.accountLock(request.getFromAccountNumber()),
+                lockKeyGenerator.accountLock(request.getToAccountNumber())
         );
 
-        receiver.setCurrentBalance(
-                receiverBalanceBefore.add(request.getAmount())
-        );
+        lockKeys = lockKeys.stream()
+                .sorted()
+                .toList();
 
-        // Save updated accounts
-        accountRepository.saveAll(List.of(sender, receiver));
+        return distributedLockService.executeWithLocks(lockKeys, () -> {
 
-        // Record sender ledger entry
-        ledgerService.recordEntry(
-                sender,
-                transactionReference,
-                EntryType.DEBIT,
-                request.getAmount(),
-                senderBalanceBefore,
-                sender.getCurrentBalance(),
-                "Transfer to " + receiver.getAccountNumber()
-        );
+            Account sender = getAccountByNumber(request.getFromAccountNumber());
+            Account receiver = getAccountByNumber(request.getToAccountNumber());
 
-        // Record receiver ledger entry
-        ledgerService.recordEntry(
-                receiver,
-                transactionReference,
-                EntryType.CREDIT,
-                request.getAmount(),
-                receiverBalanceBefore,
-                receiver.getCurrentBalance(),
-                "Transfer from " + sender.getAccountNumber()
-        );
+            // Cannot transfer to the same account
+            if (sender.getAccountNumber().equals(receiver.getAccountNumber())) {
+                throw new BadRequestException(ApiMessages.SAME_ACCOUNT_TRANSFER);
+            }
 
-        // Return response
-        return transferMapper.toResponse(
-                transactionReference,
-                sender.getAccountNumber(),
-                receiver.getAccountNumber(),
-                request.getAmount()
-        );
+            // Check sufficient balance
+            if (sender.getCurrentBalance().compareTo(request.getAmount()) < 0) {
+                throw new InsufficientBalanceException(ApiMessages.INSUFFICIENT_BALANCE);
+            }
+
+            // Generate transaction reference
+            String transactionReference = transactionReferenceGenerator.generate();
+
+            // Store balances before transaction
+            BigDecimal senderBalanceBefore = sender.getCurrentBalance();
+            BigDecimal receiverBalanceBefore = receiver.getCurrentBalance();
+
+            // Update balances
+            sender.setCurrentBalance(
+                    senderBalanceBefore.subtract(request.getAmount())
+            );
+
+            receiver.setCurrentBalance(
+                    receiverBalanceBefore.add(request.getAmount())
+            );
+
+            // Save updated accounts
+            accountRepository.saveAll(List.of(sender, receiver));
+
+            // Record sender ledger entry
+            ledgerService.recordEntry(
+                    sender,
+                    transactionReference,
+                    EntryType.DEBIT,
+                    request.getAmount(),
+                    senderBalanceBefore,
+                    sender.getCurrentBalance(),
+                    "Transfer to " + receiver.getAccountNumber()
+            );
+
+            // Record receiver ledger entry
+            ledgerService.recordEntry(
+                    receiver,
+                    transactionReference,
+                    EntryType.CREDIT,
+                    request.getAmount(),
+                    receiverBalanceBefore,
+                    receiver.getCurrentBalance(),
+                    "Transfer from " + sender.getAccountNumber()
+            );
+
+            return transferMapper.toResponse(
+                    transactionReference,
+                    sender.getAccountNumber(),
+                    receiver.getAccountNumber(),
+                    request.getAmount()
+            );
+        });
     }
 
     private Account getAccountByNumber(String accountNumber) {

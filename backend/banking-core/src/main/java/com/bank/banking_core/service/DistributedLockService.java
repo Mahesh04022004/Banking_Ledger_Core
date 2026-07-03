@@ -1,12 +1,13 @@
 package com.bank.banking_core.service;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 public interface DistributedLockService {
 
-    void executeWithLocks(
+    <T> T executeWithLocks(
             List<String> lockKeys,
-            Runnable action
+            Supplier<T> action
     );
 
 }
