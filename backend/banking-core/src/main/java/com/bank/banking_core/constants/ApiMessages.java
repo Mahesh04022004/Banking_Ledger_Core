@@ -45,4 +45,10 @@ public final class ApiMessages {
 
     public static final String TRANSACTION_NOT_FOUND =
             "Transaction not found.";
+
+    public static final String STATEMENT_FETCHED_SUCCESSFULLY =
+            "Account statement fetched successfully.";
+
+    public static final String TRANSACTION_FETCHED_SUCCESSFULLY =
+            "Transaction fetched successfully.";
 }
