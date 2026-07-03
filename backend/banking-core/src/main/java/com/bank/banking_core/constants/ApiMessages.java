@@ -42,4 +42,7 @@ public final class ApiMessages {
 
     public static final String SAME_ACCOUNT_TRANSFER =
             "Sender and receiver accounts cannot be the same.";
+
+    public static final String TRANSACTION_NOT_FOUND =
+            "Transaction not found.";
 }
